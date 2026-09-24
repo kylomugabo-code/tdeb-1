@@ -1,0 +1,706 @@
+You are a senior Forex algorithmic-trading developer and Python engineer.
+
+Build a production-quality automated FOREX trading bot that can operate with a broker API such as MetaTrader 5 or another supported Forex broker API.
+
+The system must prioritize capital preservation and strict risk management. There is NO guarantee of profit and the bot must never claim to be risk-free.
+
+==================================================
+
+1. DEFAULT MODE
+   ==================================================
+
+The bot MUST default to:
+
+TRADING_MODE=paper
+
+Never activate live trading automatically.
+
+Live trading should require:
+
+TRADING_MODE=live
+
+and an additional safety confirmation:
+
+ENABLE_LIVE_TRADING=false
+
+Both must explicitly allow live trading before an order can be submitted.
+
+==================================================
+2. FOREX PAIRS
+==============
+
+Support major Forex pairs initially:
+
+EURUSD
+GBPUSD
+USDJPY
+USDCHF
+USDCAD
+AUDUSD
+NZDUSD
+
+Optionally support:
+
+EURGBP
+EURJPY
+GBPJPY
+XAUUSD
+
+Do not trade all pairs simultaneously.
+
+Allow the user to configure the allowed pairs.
+
+Example:
+
+SYMBOLS=EURUSD,GBPUSD,USDJPY
+
+==================================================
+3. FOREX TIMEFRAMES
+===================
+
+Use multiple timeframes.
+
+Higher timeframe:
+H1 or H4
+
+Entry timeframe:
+M15
+
+Optional confirmation:
+M5
+
+The higher timeframe determines the primary trend.
+
+The lower timeframe is used for entry timing.
+
+Do not enter a trade when the timeframes strongly disagree.
+
+==================================================
+4. STRATEGY
+===========
+
+Create a conservative multi-confirmation Forex strategy.
+
+Use:
+
+* EMA 50
+* EMA 200
+* RSI 14
+* ATR 14
+* Price structure
+* Support/resistance
+* Spread
+* Trading session
+* Optional volume/tick-volume confirmation
+
+LONG example:
+
+1. Price is above EMA 200 on the higher timeframe.
+2. EMA 50 is above EMA 200.
+3. Price pulls back toward EMA 50 or a valid support zone.
+4. RSI confirms bullish momentum without being extremely overbought.
+5. Entry timeframe produces bullish confirmation.
+6. Spread is below the maximum allowed spread.
+7. ATR indicates sufficient market movement.
+8. Risk-management checks pass.
+
+SHORT example:
+
+1. Price is below EMA 200 on the higher timeframe.
+2. EMA 50 is below EMA 200.
+3. Price pulls back toward EMA 50 or resistance.
+4. RSI confirms bearish momentum without being extremely oversold.
+5. Entry timeframe produces bearish confirmation.
+6. Spread is acceptable.
+7. ATR indicates sufficient volatility.
+8. Risk-management checks pass.
+
+If the conditions are not sufficiently aligned:
+
+SIGNAL = NO_TRADE
+
+Do not force trades.
+
+==================================================
+5. RISK MANAGEMENT
+==================
+
+Risk management is more important than the entry strategy.
+
+Default:
+
+RISK_PER_TRADE=0.5%
+
+MAX_DAILY_LOSS=2%
+
+MAX_WEEKLY_LOSS=5%
+
+MAX_OPEN_TRADES=3
+
+MAX_TOTAL_RISK=1.5%
+
+MAX_CONSECUTIVE_LOSSES=3
+
+MIN_RISK_REWARD=1.5
+
+The bot must calculate position size based on the distance between entry and stop-loss.
+
+Never use a fixed lot size for every trade.
+
+==================================================
+6. FOREX POSITION SIZING
+========================
+
+Implement proper Forex position sizing.
+
+The calculation must account for:
+
+* Account currency
+* Currency pair
+* Lot size
+* Pip size
+* Pip value
+* Entry price
+* Stop-loss price
+* Account equity
+* Risk percentage
+
+Example:
+
+Account equity = $1,000
+Risk = 0.5%
+Maximum risk = $5
+
+If the calculated trade risk exceeds $5:
+
+DO NOT PLACE THE TRADE.
+
+Support:
+
+0.01 lots
+0.02 lots
+0.10 lots
+1.00 lots
+
+according to broker minimums and maximums.
+
+Round position size according to the broker's allowed volume step.
+
+==================================================
+7. STOP LOSS
+============
+
+Every Forex position MUST have a stop-loss.
+
+Use ATR and market structure.
+
+Example:
+
+Stop distance =
+max(
+ATR × configured multiplier,
+distance beyond recent swing high/low
+)
+
+Never widen a stop-loss simply because a trade is losing.
+
+==================================================
+8. TAKE PROFIT
+==============
+
+Default:
+
+MIN_RISK_REWARD=1.5
+
+Example:
+
+Stop loss = 20 pips
+
+Minimum take profit = 30 pips.
+
+Allow configuration for:
+
+1.5R
+2R
+2.5R
+3R
+
+Do not open trades where the available market structure makes the required reward unrealistic.
+
+==================================================
+9. SPREAD FILTER
+================
+
+Forex spread is critical.
+
+Before every trade calculate:
+
+spread_pips = ask - bid
+
+Reject the trade if:
+
+spread > MAX_SPREAD_PIPS
+
+Allow pair-specific spread limits.
+
+Example:
+
+EURUSD: 1.5 pips
+GBPUSD: 2.0 pips
+USDJPY: 1.5 pips
+GBPJPY: 3.0 pips
+
+Make these configurable.
+
+==================================================
+10. SLIPPAGE
+============
+
+Implement maximum allowed slippage.
+
+If actual execution price differs from the expected price beyond the configured limit:
+
+Reject or safely cancel the order where broker functionality permits.
+
+Log the event.
+
+==================================================
+11. FOREX SESSION FILTER
+========================
+
+Support configurable trading sessions.
+
+Default preferred sessions:
+
+London session
+New York session
+London/New York overlap
+
+Allow the user to disable Asian-session trading.
+
+Do not trade during configured high-risk periods.
+
+==================================================
+12. NEWS FILTER
+===============
+
+Create an optional economic-news filter.
+
+The bot should be able to prevent new trades around major economic announcements such as:
+
+* Central bank interest-rate decisions
+* CPI
+* NFP
+* GDP
+* Employment reports
+* Major monetary-policy announcements
+
+Make this feature configurable:
+
+NEWS_FILTER_ENABLED=true
+
+Do not depend on a news API unless one is configured.
+
+If reliable news data is unavailable and the filter is enabled:
+
+DO NOT OPEN NEW TRADES.
+
+==================================================
+13. DAILY LOSS PROTECTION
+=========================
+
+At the start of every trading day record account equity.
+
+If daily drawdown reaches:
+
+2%
+
+stop opening new positions.
+
+If daily drawdown reaches a configurable emergency threshold:
+
+close or manage existing positions according to the configured emergency policy.
+
+Do not reset the loss counter simply because the bot restarts.
+
+Persist daily risk state.
+
+==================================================
+14. CONSECUTIVE LOSS PROTECTION
+===============================
+
+After 3 consecutive losing trades:
+
+STOP NEW ENTRIES.
+
+Require a cooldown period.
+
+Example:
+
+COOLDOWN_AFTER_LOSS_MINUTES=120
+
+The bot may resume only after the cooldown and after all risk checks pass.
+
+==================================================
+15. CORRELATION CONTROL
+=======================
+
+Avoid opening several highly correlated Forex positions.
+
+For example, do not simultaneously accumulate excessive exposure to USD.
+
+Calculate currency exposure.
+
+Example:
+
+EURUSD LONG
+GBPUSD LONG
+USDCHF SHORT
+
+These positions may all represent substantial USD exposure.
+
+Create a currency-exposure risk manager.
+
+Reject trades that exceed:
+
+MAX_CURRENCY_EXPOSURE
+
+==================================================
+16. TRADE MANAGEMENT
+====================
+
+After entering:
+
+* Monitor stop-loss
+* Monitor take-profit
+* Track spread
+* Track execution
+* Optionally activate breakeven
+* Optionally activate trailing stop
+
+Never move the stop farther from the entry to avoid a loss.
+
+Optional:
+
+Move SL to breakeven after +1R.
+
+Optional trailing stop after +1.5R.
+
+Make both configurable.
+
+==================================================
+17. BROKER INTEGRATION
+======================
+
+Primary implementation:
+
+MetaTrader 5 Python integration.
+
+Create a broker abstraction so another broker can be added later.
+
+Example:
+
+BrokerInterface
+
+methods:
+
+connect()
+disconnect()
+get_account()
+get_symbol()
+get_tick()
+get_positions()
+get_orders()
+calculate_margin()
+calculate_pip_value()
+place_market_order()
+modify_position()
+close_position()
+
+Do not assume every broker uses the same symbol names.
+
+Support broker suffixes such as:
+
+EURUSD
+EURUSDm
+EURUSD.a
+
+Make symbol mapping configurable.
+
+==================================================
+18. MARKET DATA SAFETY
+======================
+
+Before trading verify:
+
+* Tick data exists
+* Bid exists
+* Ask exists
+* Spread is valid
+* Timestamp is recent
+* Candles are complete
+* Indicators contain enough data
+
+If market data is stale:
+
+NO TRADE.
+
+Never trade using missing or guessed prices.
+
+==================================================
+19. ORDER SAFETY
+================
+
+Before sending an order create an order preview:
+
+PAIR
+DIRECTION
+ENTRY
+STOP LOSS
+TAKE PROFIT
+LOT SIZE
+PIP RISK
+MONEY RISK
+RISK %
+SPREAD
+EXPECTED SLIPPAGE
+RISK/REWARD
+ACCOUNT EQUITY
+
+Then perform final risk validation.
+
+Prevent duplicate orders using a unique trade ID.
+
+==================================================
+20. EMERGENCY KILL SWITCH
+=========================
+
+Create:
+
+KILL_SWITCH=false
+
+If:
+
+KILL_SWITCH=true
+
+the bot must immediately stop opening new trades.
+
+Also create a command such as:
+
+python -m src.main --kill
+
+The emergency mechanism must remain functional even if the strategy crashes.
+
+==================================================
+21. BACKTESTING
+===============
+
+Create a Forex backtesting engine.
+
+Test across multiple currency pairs and market conditions.
+
+Include:
+
+* Spread
+* Commission
+* Slippage
+* Swap where applicable
+* Position sizing
+* Stop-loss
+* Take-profit
+* Trading sessions
+
+Report:
+
+Total trades
+Win rate
+Profit factor
+Maximum drawdown
+Average R
+Expectancy
+Average win
+Average loss
+Largest losing streak
+Sharpe ratio where appropriate
+Total return
+
+Do NOT optimize only for maximum historical profit.
+
+Avoid overfitting.
+
+Include out-of-sample testing.
+
+==================================================
+22. PAPER TRADING
+=================
+
+Paper trading must reproduce live trading logic as closely as possible.
+
+Run:
+
+python -m src.main --mode paper
+
+The bot should produce realistic:
+
+ENTRY
+SL
+TP
+LOT SIZE
+SPREAD
+P/L
+RISK
+
+without sending real orders.
+
+==================================================
+23. LIVE TRADING
+================
+
+Live trading must require explicit configuration.
+
+Example:
+
+TRADING_MODE=live
+ENABLE_LIVE_TRADING=true
+
+If either condition is false:
+
+NO REAL ORDERS.
+
+Before the first live order, print:
+
+WARNING:
+REAL MONEY TRADING ENABLED
+
+Then require explicit confirmation.
+
+==================================================
+24. LOGGING
+===========
+
+Log every signal.
+
+Example:
+
+2026-09-23 15:30
+EURUSD
+SIGNAL=BUY
+ENTRY=1.XXXX
+SL=1.XXXX
+TP=1.XXXX
+LOTS=0.01
+RISK=$5
+RISK%=0.5
+RR=2.0
+SPREAD=0.8
+REASON=EMA+RSI+STRUCTURE
+
+Also log:
+
+* rejected trades
+* risk violations
+* API errors
+* broker errors
+* stop-outs
+* take-profits
+* daily drawdown
+* connection problems
+
+Never log API secrets.
+
+==================================================
+25. GITHUB SECURITY
+===================
+
+Create:
+
+.env.example
+
+Example:
+
+MT5_LOGIN=
+MT5_PASSWORD=
+MT5_SERVER=
+
+Never put credentials inside Python files.
+
+Add:
+
+.env
+
+to:
+
+.gitignore
+
+Also prevent secrets from appearing in logs.
+
+==================================================
+26. TESTING
+===========
+
+Write automated tests for:
+
+* Pip calculations
+* Pip value calculations
+* Lot calculations
+* Stop-loss calculations
+* Take-profit calculations
+* Risk percentage
+* Spread filter
+* Daily loss limit
+* Weekly loss limit
+* Maximum exposure
+* Correlation filter
+* News filter
+* Duplicate orders
+* Stale data
+* Broker disconnection
+* Kill switch
+* Paper trading
+
+Tests must NEVER place real Forex orders.
+
+==================================================
+27. PROJECT COMMANDS
+====================
+
+Provide:
+
+python -m src.backtest
+
+python -m src.main --mode paper
+
+python -m src.main --mode live
+
+python -m src.main --status
+
+python -m src.main --kill
+
+==================================================
+28. FINAL SAFETY CHECK
+======================
+
+Before declaring the project complete, inspect the entire codebase.
+
+Verify:
+
+* No hard-coded credentials
+* No automatic live trading
+* No trade without stop-loss
+* No trade exceeding risk limit
+* No duplicate orders
+* No trading with stale data
+* No trading after daily loss limit
+* No uncontrolled leverage
+* No martingale
+* No averaging-down loop
+* No hidden order execution
+* Kill switch works
+* Paper mode works
+* Tests pass
+
+The final README must clearly state:
+
+"Past performance does not guarantee future results. Automated Forex trading involves substantial risk, including loss of capital."
+
+Do not claim the strategy is guaranteed profitable, perfectly accurate, or risk-free.
